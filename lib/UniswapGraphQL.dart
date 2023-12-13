@@ -51,6 +51,7 @@ class UniSwapGraphQL {
       } 
       """;
   Future<Map<String, String>> getPriceInfoNew(String address) async {
+
     QueryResult<Object?> queryResult = await (graphQLClient.query(QueryOptions(
         document: gql(getTokenDetailCommand), variables: {'id': address})));
 

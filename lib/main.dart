@@ -1,10 +1,13 @@
 // main.dart
 import 'package:flutter/material.dart';
+import 'package:graphql_flutter/graphql_flutter.dart';
 import 'package:import_erc20_tokens/token.dart';
 import 'package:provider/provider.dart';
 import 'token_provider.dart';
 
-void main() {
+Future<void> main() async {
+  //for calling GraphQL
+  await initHiveForFlutter();
   runApp(MyApp());
 }
 
@@ -21,11 +24,44 @@ class MyApp extends StatelessWidget {
   }
 }
 
-class MyHomePage extends StatelessWidget {
+class MyHomePage extends StatefulWidget {
+  @override
+  State<MyHomePage> createState() => _MyHomePageState();
+}
+
+class _MyHomePageState extends State<MyHomePage> {
   final TextEditingController _addressController = TextEditingController();
   final TextEditingController _symbolController = TextEditingController();
   final TextEditingController _decimalController = TextEditingController();
   final TextEditingController _logoController = TextEditingController();
+
+  bool _areFieldsEditable = true;
+
+  void _onAddressChanged(BuildContext context, String value) async {
+    // Your logic to update Token Symbol, Token Decimal, and Token Logo
+    // Fetch token details and update the corresponding fields
+    final TokenProvider tokenProvider = context.read<TokenProvider>();
+    final token = await tokenProvider.fetchTokenDetails(value);
+
+    if (token != null) {
+      _symbolController.text = token['symbol'];
+      _decimalController.text = token['decimals'];
+      _logoController.text = token['logoURI'];
+      // Set the flag to make fields read-only
+      _areFieldsEditable = false;
+    } else {
+      clearFields();
+    }
+    setState(() {});
+  }
+
+  void clearFields() {
+    // Clear Token Symbol, Token Decimal, and Token Logo if no valid token is found
+    _symbolController.clear();
+    _decimalController.clear();
+    _logoController.clear();
+    _areFieldsEditable = true;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -38,39 +74,40 @@ class MyHomePage extends StatelessWidget {
         child: Column(
           children: [
             TextField(
-              controller: _addressController,
-              decoration: InputDecoration(
-                labelText: 'Token Address',
-              ),
-            ),
-            SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () => _importToken(context),
-              child: Text('Import Token'),
-            ),
+                controller: _addressController,
+                decoration: InputDecoration(
+                    labelText: 'Token Address',
+                    filled: true,
+                    fillColor: Colors.white),
+                onChanged: (value) {
+                  _onAddressChanged(context, value);
+                }),
             SizedBox(height: 16),
             TextField(
               controller: _symbolController,
               decoration: InputDecoration(
                 labelText: 'Token Symbol',
+                filled: true,
+                fillColor: _areFieldsEditable ? Colors.white : Colors.grey,
               ),
-              readOnly: true,
+              readOnly: !_areFieldsEditable,
             ),
             SizedBox(height: 16),
             TextField(
               controller: _decimalController,
               decoration: InputDecoration(
                 labelText: 'Token Decimal',
+                filled: true,
+                fillColor: _areFieldsEditable ? Colors.white : Colors.grey,
               ),
-              readOnly: true,
+              readOnly: !_areFieldsEditable,
             ),
             SizedBox(height: 16),
-            TextField(
-              controller: _logoController,
-              decoration: InputDecoration(
-                labelText: 'Token Logo',
-              ),
-              readOnly: true,
+            _buildTokenLogo(_logoController.text),
+            SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () => _importToken(context),
+              child: Text('Import Token'),
             ),
             SizedBox(height: 16),
             Text(
@@ -102,6 +139,8 @@ class MyHomePage extends StatelessWidget {
               children: [
                 Text('Symbol: ${token.symbol}'),
                 Text('Decimal: ${token.decimals}'),
+                Text(
+                    'Price: \$${token.currentPriceUSD} (${token.changePercent24hr}%)'),
               ],
             ),
             leading: _buildTokenLogo(token.logoURI), // Added this line
@@ -141,16 +180,10 @@ class MyHomePage extends StatelessWidget {
     final TokenProvider tokenProvider = context.read<TokenProvider>();
 
     await tokenProvider.addToken(address);
-
-    // Fetch and update additional token details
-    final Token importedToken = tokenProvider.tokens.last;
-
-    _symbolController.text = importedToken.symbol;
-    _decimalController.text = importedToken.decimals.toString();
-    _logoController.text = importedToken.logoURI;
-
     // Clear the Token Address field
     _addressController.clear();
+    clearFields();
+    setState(() {});
   }
 
   void _deleteToken(BuildContext context, Token token) {

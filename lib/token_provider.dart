@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/http.dart';
+import 'package:import_erc20_tokens/UniswapGraphQL.dart';
 import 'package:web3dart/web3dart.dart';
 import 'token.dart';
 import 'token_database_provider.dart';
@@ -52,7 +53,7 @@ class TokenProvider extends ChangeNotifier {
     }
 
     // Fetch token details using web3dart
-    final tokenDetails = await _fetchTokenDetails(address);
+    final tokenDetails = await fetchTokenDetails(address);
 
     if (tokenDetails != null) {
       final Token token = Token(
@@ -85,50 +86,65 @@ class TokenProvider extends ChangeNotifier {
     await _databaseProvider.deleteToken(id);
   }
 
-  Future<Map<String, dynamic>?> _fetchTokenDetails(String address) async {
+  Future<Map<String, dynamic>?> fetchTokenDetails(String address) async {
     final apiUrl =
         'https://api.coingecko.com/api/v3/coins/ethereum/contract/$address';
     const apiUrlUniswap = 'https://gateway.ipfs.io/ipns/tokens.uniswap.org';
     const apiUrlUniswapExtended = 'https://extendedtokens.uniswap.org/';
 
-    final response = await http.get(Uri.parse(apiUrl));
-    final responseUniswap = await http.get(Uri.parse(apiUrlUniswap));
-    final responseUniswapExtended =
-        await http.get(Uri.parse(apiUrlUniswapExtended));
+    UniSwapGraphQL uni = UniSwapGraphQL();
+    Map<String, String> graphQLPriceData = await uni.getPriceInfoNew(address);
 
-    // Parse the JSON string
-    Map<String, dynamic> data = json.decode(response.body);
-    Map<String, dynamic> jsonDataUniswap = json.decode(responseUniswap.body);
-    Map<String, dynamic> jsonDataUniswapExtended =
-        json.decode(responseUniswapExtended.body);
+    if (graphQLPriceData['currentPriceUSD'] != '0' && graphQLPriceData['currentRate'] != '0') {
+      final response = await http.get(Uri.parse(apiUrl));
+      final responseUniswap = await http.get(Uri.parse(apiUrlUniswap));
+      final responseUniswapExtended =
+          await http.get(Uri.parse(apiUrlUniswapExtended));
 
-    // Find the token with the specified address in jsonDataUniswap
-    Map<String, dynamic>? tokenData = jsonDataUniswap['tokens'].firstWhere(
-      (token) =>
-          token['address'].toString().toLowerCase() == address.toLowerCase(),
-      orElse: () => null,
-    );
+      // Parse the JSON string
+      Map<String, dynamic> data = json.decode(response.body);
+      Map<String, dynamic> jsonDataUniswap = json.decode(responseUniswap.body);
+      Map<String, dynamic> jsonDataUniswapExtended =
+          json.decode(responseUniswapExtended.body);
 
-    // If the token is not found in jsonDataUniswap, try jsonDataUniswapExtended
-    tokenData ??= jsonDataUniswapExtended['tokens'].firstWhere(
-      (token) =>
-          token['address'].toString().toLowerCase() == address.toLowerCase(),
-      orElse: () => null,
-    );
+      // Find the token with the specified address in jsonDataUniswap
+      Map<String, dynamic>? tokenData = jsonDataUniswap['tokens'].firstWhere(
+        (token) =>
+            token['address'].toString().toLowerCase() == address.toLowerCase(),
+        orElse: () => null,
+      );
 
-    if (tokenData != null) {
-      // Create a Token object from the token data
-      Token token = Token.fromJson(tokenData);
-      return {
-        'name': token.name,
-        'symbol': token.symbol,
-        'decimals': token.decimals,
-        'logoURI': token.logoURI,
-        'currentPriceUSD': '',
-        'changePercent24hr': '',
-      };
-    } else {
-      return null;
+      // If the token is not found in jsonDataUniswap, try jsonDataUniswapExtended
+      tokenData ??= jsonDataUniswapExtended['tokens'].firstWhere(
+        (token) =>
+            token['address'].toString().toLowerCase() == address.toLowerCase(),
+        orElse: () => null,
+      );
+
+      if (tokenData != null) {
+        // Create a Token object from the token data
+        Token token = Token.fromJson(tokenData);
+        return {
+          'name': token.name,
+          'symbol': token.symbol,
+          'decimals': token.decimals,
+          'logoURI': token.logoURI.contains('ipfs://')
+              ? parseIPFSLink(token.logoURI)
+              : token.logoURI,
+          'currentPriceUSD': graphQLPriceData['currentPriceUSD'],
+          'changePercent24hr': graphQLPriceData['currentRate'],
+        };
+      }
+    } 
+    return null;
+  }
+
+  String parseIPFSLink(String ipfsLink) {
+    if (ipfsLink.startsWith("ipfs://")) {
+      final hash = ipfsLink.substring("ipfs://".length);
+      return "https://ipfs.io/ipfs/$hash";
     }
+    // Return the original link if it doesn't start with "ipfs://"
+    return ipfsLink;
   }
 }
