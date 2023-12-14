@@ -51,6 +51,28 @@ class _MyHomePageState extends State<MyHomePage> {
       _areFieldsEditable = false;
     } else {
       clearFields();
+
+      // Show an alert dialog when token is null
+      if (context.mounted) {
+        showDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: Text('Data is Empty'),
+              content:
+                  Text('Token data is empty. Please check the token address.'),
+              actions: <Widget>[
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                  child: Text('OK'),
+                ),
+              ],
+            );
+          },
+        );
+      }
     }
     setState(() {});
   }
@@ -141,6 +163,8 @@ class _MyHomePageState extends State<MyHomePage> {
                 Text('Decimal: ${token.decimals}'),
                 Text(
                     'Price: \$${token.currentPriceUSD} (${token.changePercent24hr}%)'),
+                Text(
+                    'Coin Gecko: \$${token.coinGeckoPriceUSD} (${token.coinGeckoChangePercent24hr}%)'),
               ],
             ),
             leading: _buildTokenLogo(token.logoURI), // Added this line
@@ -162,13 +186,14 @@ class _MyHomePageState extends State<MyHomePage> {
   Widget _buildTokenLogo(String logoURI) {
     if (logoURI.isNotEmpty) {
       return Container(
-        width: 50,
-        height: 50,
-        child: Image.network(
-          logoURI,
-          fit: BoxFit.contain,
-        ),
-      );
+          width: 50,
+          height: 50,
+          child: ClipOval(
+            child: Image.network(
+              logoURI,
+              fit: BoxFit.contain,
+            ),
+          ));
     } else {
       // If no logo URL is provided, you can display a placeholder or omit the logo
       return Container();

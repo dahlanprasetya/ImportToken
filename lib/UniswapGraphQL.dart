@@ -33,58 +33,53 @@ class UniSwapGraphQL {
     );
   }
 
-  // TEST SECOND
-  String getTokenDetailCommand = r"""
-      query getTokenInfo($id: ID)
-      {
-        token(id: $id) 
-        {
-          symbol
-          name
-          decimals
-          tokenDayData(orderBy: date, orderDirection: desc, first: 1){
-            open
-            priceUSD
-            date
-          }
+  String queryCommand = r"""
+    query getTokenInfo($id: ID) {
+      token(id: $id) {
+        symbol
+        name
+        decimals
+        tokenDayData(orderBy: date, orderDirection: desc, first: 2) {
+          open
+          priceUSD
+          date
+          low
         }
-      } 
-      """;
-  Future<Map<String, String>> getPriceInfoNew(String address) async {
+      }
+    } 
+  """;
 
-    QueryResult<Object?> queryResult = await (graphQLClient.query(QueryOptions(
-        document: gql(getTokenDetailCommand), variables: {'id': address})));
+  Future<Map<String, String>?> getUniswapV3Data(String address) async {
+    final QueryResult<Object?> queryResult = await graphQLClient.query(
+      QueryOptions(
+        document: gql(queryCommand),
+        variables: {'id': address},
+      ),
+    );
 
-    String currentTokenPrice = '0';
-    String todayOpenPrice = '0';
-    String currentRate = '0';
-    Map<String, String> currentPriceandRate = {
-      'currentPriceUSD': currentTokenPrice,
-      'currentRate': currentRate
-    };
-    if (queryResult.data != null) {
-      Object queryTokenData = queryResult.data?['token']['tokenDayData'][0];
-      Map<String, dynamic> mapQueryTokenData =
-          (queryTokenData as Map<String, dynamic>);
-      // log("$queryTokenData ${mapQueryTokenData['open']}");
-      currentTokenPrice = mapQueryTokenData['priceUSD'];
-      todayOpenPrice = mapQueryTokenData['open'];
-      currentRate = getRate(todayOpenPrice, currentTokenPrice);
-      currentPriceandRate['currentPriceUSD'] = currentTokenPrice;
-      currentPriceandRate['currentRate'] = currentRate;
-    } else {
-      throw Exception();
+    final Map<String, dynamic>? tokenData = queryResult.data?['token'];
+    if (tokenData != null) {
+      final currentPrice = tokenData['tokenDayData'][0]['priceUSD'];
+      final previousPrice = tokenData['tokenDayData'][1]['priceUSD'];
+      final currentRate = calculateRate(previousPrice, currentPrice);
+      final Map<String, String> uniswapV3Data = {
+        'currentPriceUSD': currentPrice,
+        'currentRate': currentRate,
+        'name': tokenData['name'],
+        'symbol': tokenData['symbol'],
+        'decimals': tokenData['decimals'],
+      };
+      return uniswapV3Data;
     }
-    // return currentTokenPrice;
-    return currentPriceandRate;
+    return null;
   }
 
-  String getRate(String openPrice, currentPriceUSD) {
-    double doubleOpenPrice = double.tryParse(openPrice) ?? 0.0;
-    double doubleCurrentPrice = double.tryParse(currentPriceUSD) ?? 0.0;
+  String calculateRate(String prevPrice, String currentPrice) {
+    final double doublePreviousPrice = double.tryParse(prevPrice) ?? 0.0;
+    final double doubleCurrentPrice = double.tryParse(currentPrice) ?? 0.0;
 
     double rate =
-        (doubleCurrentPrice - doubleOpenPrice) / doubleOpenPrice * 100;
+        (doubleCurrentPrice - doublePreviousPrice) / doublePreviousPrice * 100;
     return rate.toString();
   }
 }

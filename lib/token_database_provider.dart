@@ -9,11 +9,18 @@ class TokenDatabaseProvider {
   Future<void> open() async {
     _database = await openDatabase(
       'token_database.db',
-      version: 2, // Increment the version number when there's a schema change
+      version: 3, // Increment the version number when there's a schema change
       onCreate: (db, version) {
         return db.execute(
           'CREATE TABLE IF NOT EXISTS tokensImported(id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, symbol TEXT, address TEXT, decimals TEXT, logoURI TEXT, currentPriceUSD TEXT, changePercent24hr TEXT)',
         );
+      },
+      onUpgrade: (db, oldVersion, newVersion) {
+        if (oldVersion < 3) {
+          // Add new columns using ALTER TABLE
+          db.execute('ALTER TABLE tokensImported ADD COLUMN coinGeckoPriceUSD TEXT');
+          db.execute('ALTER TABLE tokensImported ADD COLUMN coinGeckoChangePercent24hr TEXT');
+        }
       },
     );
     print(_database.path.toString());
@@ -54,6 +61,8 @@ class TokenDatabaseProvider {
         logoURI: maps[i]['logoURI'],
         currentPriceUSD: maps[i]['currentPriceUSD'],
         changePercent24hr: maps[i]['changePercent24hr'],
+        coinGeckoPriceUSD: maps[i]['coinGeckoPriceUSD'] ?? '',
+        coinGeckoChangePercent24hr: maps[i]['coinGeckoChangePercent24hr'] ?? '',
       );
     });
   }

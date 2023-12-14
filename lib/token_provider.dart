@@ -65,6 +65,8 @@ class TokenProvider extends ChangeNotifier {
         logoURI: tokenDetails['logoURI'],
         currentPriceUSD: tokenDetails['currentPriceUSD'],
         changePercent24hr: tokenDetails['changePercent24hr'],
+        coinGeckoPriceUSD: tokenDetails['coinGeckoPriceUSD'],
+        coinGeckoChangePercent24hr: tokenDetails['coinGeckoChangePercent24hr'],
       );
 
       // Add the token to the provider
@@ -93,9 +95,9 @@ class TokenProvider extends ChangeNotifier {
     const apiUrlUniswapExtended = 'https://extendedtokens.uniswap.org/';
 
     UniSwapGraphQL uni = UniSwapGraphQL();
-    Map<String, String> graphQLPriceData = await uni.getPriceInfoNew(address);
+    Map<String, String>? graphQLPriceData = await uni.getUniswapV3Data(address);
 
-    if (graphQLPriceData['currentPriceUSD'] != '0' && graphQLPriceData['currentRate'] != '0') {
+    if (graphQLPriceData != null) {
       final response = await http.get(Uri.parse(apiUrl));
       final responseUniswap = await http.get(Uri.parse(apiUrlUniswap));
       final responseUniswapExtended =
@@ -121,21 +123,25 @@ class TokenProvider extends ChangeNotifier {
         orElse: () => null,
       );
 
-      if (tokenData != null) {
-        // Create a Token object from the token data
-        Token token = Token.fromJson(tokenData);
-        return {
-          'name': token.name,
-          'symbol': token.symbol,
-          'decimals': token.decimals,
-          'logoURI': token.logoURI.contains('ipfs://')
-              ? parseIPFSLink(token.logoURI)
-              : token.logoURI,
-          'currentPriceUSD': graphQLPriceData['currentPriceUSD'],
-          'changePercent24hr': graphQLPriceData['currentRate'],
-        };
-      }
-    } 
+      // Create a Token object from the token data
+      // Token token = Token.fromJson(tokenData);
+      return {
+        'name': graphQLPriceData['name'] ?? '',
+        'symbol': graphQLPriceData['symbol'] ?? '',
+        'decimals': graphQLPriceData['decimals'].toString(),
+        'logoURI': tokenData?['logoURI'] != null
+            ? (tokenData?['logoURI'].contains('ipfs://')
+                ? parseIPFSLink(tokenData?['logoURI'])
+                : tokenData?['logoURI'])
+            : buildInitialImage(graphQLPriceData['symbol']!),
+        'currentPriceUSD': graphQLPriceData['currentPriceUSD'],
+        'changePercent24hr': graphQLPriceData['currentRate'],
+        'coinGeckoPriceUSD':
+            (data['market_data']['current_price']['usd']).toString(),
+        'coinGeckoChangePercent24hr':
+            (data['market_data']['price_change_percentage_24h']).toString(),
+      };
+    }
     return null;
   }
 
@@ -146,5 +152,12 @@ class TokenProvider extends ChangeNotifier {
     }
     // Return the original link if it doesn't start with "ipfs://"
     return ipfsLink;
+  }
+
+  String buildInitialImage(String symbol) {
+    String truncateSymbol = symbol.substring(0, 1);
+    String imageUrl =
+        'https://api.dicebear.com/7.x/initials/png?seed=$truncateSymbol&backgroundColor=111111';
+    return imageUrl;
   }
 }

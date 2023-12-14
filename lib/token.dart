@@ -1,5 +1,5 @@
 class Token {
-  late int id; 
+  late int id;
   final String name;
   final String symbol;
   final String address;
@@ -7,6 +7,8 @@ class Token {
   final String logoURI;
   final String currentPriceUSD;
   final String changePercent24hr;
+  final String coinGeckoPriceUSD;
+  final String coinGeckoChangePercent24hr;
 
   Token({
     required this.id,
@@ -17,6 +19,8 @@ class Token {
     required this.logoURI,
     required this.currentPriceUSD,
     required this.changePercent24hr,
+    required this.coinGeckoPriceUSD,
+    required this.coinGeckoChangePercent24hr,
   });
 
   Map<String, dynamic> toMap() {
@@ -28,6 +32,8 @@ class Token {
       'logoURI': logoURI,
       'currentPriceUSD': currentPriceUSD,
       'changePercent24hr': changePercent24hr,
+      'coinGeckoPriceUSD': coinGeckoPriceUSD,
+      'coinGeckoChangePercent24hr': coinGeckoChangePercent24hr,
     };
   }
 
@@ -39,8 +45,10 @@ class Token {
       address: json['address'],
       decimals: json['decimals'].toString(),
       logoURI: json['logoURI'],
-      currentPriceUSD: '',
-      changePercent24hr: '',
+      currentPriceUSD: json['currentPriceUSD'] ?? '',
+      changePercent24hr: json['changePercent24hr'] ?? '',
+      coinGeckoPriceUSD: json['coinGeckoPriceUSD'] ?? '',
+      coinGeckoChangePercent24hr: json['coinGeckoChangePercent24hr'] ?? '',
     );
   }
 }
